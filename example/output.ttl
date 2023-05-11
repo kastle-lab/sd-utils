@@ -1,0 +1,34 @@
+@prefix kastle-ont: <https://kastle-labl.org/lod/ontology/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+owl:Thing rdfs:subClassOf [ a owl:Restriction ;
+            owl:allValuesFrom kastle-ont:Name ;
+            owl:onProperty kastle-ont:hasName ],
+        [ a owl:Restriction ;
+            owl:onClass owl:Thing ;
+            owl:onProperty kastle-ont:hasName ;
+            owl:qualifiedCardinality "1"^^xsd:nonNegativeInteger ] .
+
+kastle-ont:Person rdfs:subClassOf [ a owl:Restriction ;
+            owl:onProperty kastle-ont:hasName ;
+            owl:someValuesFrom kastle-ont:Name ],
+        [ a owl:Restriction ;
+            owl:onProperty [ owl:inverseOf kastle-ont:hasName ] ;
+            owl:someValuesFrom kastle-ont:Name ],
+        [ a owl:Restriction ;
+            owl:allValuesFrom kastle-ont:Name ;
+            owl:onProperty kastle-ont:hasName ],
+        kastle-ont:Agent .
+
+[] a owl:Restriction ;
+    rdfs:subClassOf kastle-ont:Person ;
+    owl:onProperty kastle-ont:hasName ;
+    owl:someValuesFrom kastle-ont:Person .
+
+[] a owl:Restriction ;
+    rdfs:subClassOf kastle-ont:Person ;
+    owl:onProperty kastle-ont:hasName ;
+    owl:someValuesFrom owl:Thing .
+
