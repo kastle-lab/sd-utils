@@ -58,7 +58,12 @@ def create_restriction_node(pred, target, quant, g=g):
 	g.add( (restriction_node, OWL.onProperty, pred) )
 	# the nature of the restriction
 	try:
-		g.add( (restriction_node, quant_types[quant], target) )
+		if(target.find('xsd') == -1):
+			g.add( (restriction_node, quant_types[quant], target) )
+		else:
+			lhs = target.split("/")[-1].split(":")[0]
+			rhs = target.split("/")[-1].split(":")[1]
+			g.add( (restriction_node, quant_types[quant], pfs[lhs][rhs]) )
 	except KeyError as e:
 		raise Exception(f"Illegal restriction type: {quant}")
 
@@ -78,9 +83,15 @@ def create_cardinality_node(pred, card_type, cardinality, ont_o):
 	g.add( (restriction_node, OWL.onProperty, pred) )
 	# Add the cardinality value
 	g.add( (restriction_node, card_types[card_type], Literal(cardinality, datatype=XSD.nonNegativeInteger)) )
+		
 	# What is being restricted?
-	g.add( (restriction_node, OWL.onClass, ont_o) )
-
+	if(ont_o.find('xsd') == -1):
+		g.add( (restriction_node, OWL.onClass, ont_o) )
+	else:
+		lhs = ont_o.split("/")[-1].split(":")[0]
+		rhs = ont_o.split("/")[-1].split(":")[1]
+		g.add( (restriction_node, OWL.onDataRange, pfs[lhs][rhs]) )
+		
 	return restriction_node
 
 with open(input_file, "r") as f:
@@ -92,12 +103,21 @@ with open(input_file, "r") as f:
 		ont_s = ont_ns[s]
 		ont_o = ont_ns[o]
 
+		g.add( (ont_s, a, OWL.Class))
+
+		if(o.find('xsd') != -1):
+			g.add( ( ont_ns[p], a, OWL.DatatypeProperty ) )
+		else:
+			if(p != "sco"):
+				g.add( (ont_ns[p], a, OWL.ObjectProperty) )
+			g.add( (ont_o, a, OWL.Class) )
+
 		if p == "sco": 
 			g.add( (ont_s, sco, ont_o) )
 		else:
 			ont_p = ont_ns[p]
 			for line_no, ax_type in enumerate(ax_types, start=1):
-				if ax_type not in ["dj", "d", "sd", "r", "sr", "e", "ie", "f", "qf", "sf", "qsf", "if", "iqf", "isf", "iqsf", "st"]:
+				if ax_type not in ["dj", "d", "sd", "r", "sr", "e", "ie", "uie", "f", "qf", "sf", "qsf", "if", "iqf", "isf", "iqsf", "st"]:
 					raise Exception(f"Illegal axiom type at Line {line_no}: {ax_type}.")
 
 				if ax_type == "dj":
@@ -106,82 +126,85 @@ with open(input_file, "r") as f:
 				
 				# Domain
 				if ax_type == "d":
-					lhs = create_restriction_node(ont_p, OWL.Thing, "exists")
+					lhs = create_restriction_node(ont_p, OWL.Thing, "exists", g)
 					g.add( (lhs, sco, ont_s) )
 				
 				# Scoped Domain
 				if ax_type == "sd":
-					lhs = create_restriction_node(ont_p, ont_s, "exists")
+					lhs = create_restriction_node(ont_p, ont_s, "exists", g)
 					g.add( (lhs, sco, ont_s) )
 				
 				# Range
 				if ax_type == "r":
-					rhs = create_restriction_node(ont_p, ont_o, "forall")
+					rhs = create_restriction_node(ont_p, ont_o, "forall", g)
 					g.add( (OWL.Thing, sco, rhs) )
 				
 				# Scoped Range
 				if ax_type == "sr":
-					rhs = create_restriction_node(ont_p, ont_o, "forall")
+					rhs = create_restriction_node(ont_p, ont_o, "forall", g)
 					g.add( (ont_s, sco, rhs) )
 				
 				# Existential
 				if ax_type == "e":
-					rhs = create_restriction_node(ont_p, ont_o, "exists")
+					rhs = create_restriction_node(ont_p, ont_o, "exists", g)
 					g.add( (ont_s, sco, rhs) )
 				
 				# Inverse Existential
 				if ax_type == "ie":
-					inverse_p = create_inverse_prop(ont_p)
-					rhs = create_restriction_node(inverse_p, ont_o, "exists")
+					inverse_p = create_inverse_prop(ont_p, g)
+					rhs = create_restriction_node(inverse_p, ont_o, "exists", g)
 					g.add( (ont_s, sco, rhs) )
+
+				if ax_type == "uie":
+					pass
 				
 				# Functional
 				if ax_type == "f":
-					rhs = create_cardinality_node(ont_p, "max", 1, OWL.Thing)
+					rhs = create_cardinality_node(ont_p, "max", 1, OWL.Thing, g)
 					g.add( (OWL.Thing, sco, rhs) )
 				
 				# Qualified Functional
 				if ax_type == "qf":
-					rhs = create_cardinality_node(ont_p, "max", 1, ont_o)
+					rhs = create_cardinality_node(ont_p, "max", 1, ont_o, g)
 					g.add( (OWL.Thing, sco, rhs) )
 				
 				# Scoped Functional
 				if ax_type == "sf":
-					rhs = create_cardinality_node(ont_p, "max", 1, OWL.Thing)
+					rhs = create_cardinality_node(ont_p, "max", 1, OWL.Thing, g)
 					g.add( (ont_s, sco, rhs) )
 				
 				# Qualified Scoped Functional
 				if ax_type == "qsf":
-					rhs = create_cardinality_node(ont_p, "max", 1, ont_o)
+					rhs = create_cardinality_node(ont_p, "max", 1, ont_o, g)
 					g.add( (ont_s, sco, rhs) )
 				
 				# Inverse Functional
 				if ax_type == "if":
-					inverse_p = create_inverse_prop(ont_p)
-					rhs = create_cardinality_node(inverse_p, "max", 1, OWL.Thing)
+					inverse_p = create_inverse_prop(ont_p, g)
+					rhs = create_cardinality_node(inverse_p, "max", 1, OWL.Thing, g)
 					g.add( (OWL.Thing, sco, rhs) )
 				
 				# Inverse Qualified Functional
 				if ax_type == "iqf":
-					inverse_p = create_inverse_prop(ont_p)
-					rhs = create_cardinality_node(inverse_p, "max", 1, ont_o)
+					inverse_p = create_inverse_prop(ont_p, g)
+					rhs = create_cardinality_node(inverse_p, "max", 1, ont_o, g)
 					g.add( (OWL.Thing, sco, rhs) )
 				
 				# Inverse Scoped Functional
 				if ax_type == "isf":
-					inverse_p = create_inverse_prop(ont_p)
-					rhs = create_cardinality_node(inverse_p, "max", 1, OWL.Thing)
+					inverse_p = create_inverse_prop(ont_p, g)
+					rhs = create_cardinality_node(inverse_p, "max", 1, OWL.Thing, g)
 					g.add( (ont_s, sco, rhs) )
 				
 				# Inverse Qualified Scoped Functional
 				if ax_type == "iqsf":
-					inverse_p = create_inverse_prop(ont_p)
-					rhs = create_cardinality_node(inverse_p, "max", 1, ont_o)
+					inverse_p = create_inverse_prop(ont_p, g)
+					rhs = create_cardinality_node(inverse_p, "max", 1, ont_o, g)
 					g.add( (ont_s, sco, rhs) )
 				
 				# Structural Tautology
 				if ax_type == "st":
-					rhs = create_cardinality_node(ont_p, 0, ont_o)
+					rhs = create_cardinality_node(ont_p, "min", 0, ont_o, g)
 					g.add( (ont_s, sco, rhs) )
 
 
